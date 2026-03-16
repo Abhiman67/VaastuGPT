@@ -19,7 +19,7 @@ export default function ChatbotPanel({ onSubmit }: ChatbotPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hello! I am VaastuGPT. Let's design your ideal home. About what size home are you looking for in square feet?",
+      content: "Hello! I am Make My Home. Let's design your ideal home. About what size home are you looking for in square feet?",
     },
   ])
   const [input, setInput] = useState("")
@@ -173,7 +173,7 @@ export default function ChatbotPanel({ onSubmit }: ChatbotPanelProps) {
         </form>
         <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-gray-400 font-medium">
           <Bot size={12} />
-          Powered by Gemini AI (Maket clone)
+          Powered by Gemini AI (Make My Home)
         </div>
       </div>
     </div>

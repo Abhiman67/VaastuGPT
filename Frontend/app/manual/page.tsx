@@ -57,7 +57,7 @@ export default function ManualPage() {
           <div className="bg-[#f2f0eb] p-2 rounded-lg text-amber-700">
             <LayoutGrid size={20} />
           </div>
-          <h1 className="font-semibold text-[15px] tracking-tight text-gray-800">VaastuGPT Studio — Manual Mode</h1>
+          <h1 className="font-semibold text-[15px] tracking-tight text-gray-800">Make My Home Studio — Manual Mode</h1>
         </div>
         
         <div className="flex items-center gap-4">

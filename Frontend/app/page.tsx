@@ -8,7 +8,7 @@ export default function HomeLandingPage() {
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50 text-amber-950 font-sans">
       {/* Navigation */}
       <nav className="flex items-center justify-between p-6 max-w-6xl mx-auto">
-        <div className="font-bold text-2xl tracking-tighter text-amber-900">VaastuGPT</div>
+        <div className="font-bold text-2xl tracking-tighter text-amber-900">Make My Home</div>
         <div className="space-x-4 flex items-center">
           <Link href="/chat" className="text-sm font-medium hover:text-amber-600 transition-colors hidden sm:inline-block">
             Chat UI
@@ -66,7 +66,7 @@ export default function HomeLandingPage() {
               <Zap className="w-6 h-6" />
             </div>
             <h3 className="text-xl font-bold mb-3">Lightning Fast</h3>
-            <p className="text-amber-800 leading-relaxed">Skip the long drafting processes. VaastuGPT generates high-quality functional layouts in a matter of seconds.</p>
+            <p className="text-amber-800 leading-relaxed">Skip the long drafting processes. Make My Home generates high-quality functional layouts in a matter of seconds.</p>
           </div>
           
           <div className="bg-white/60 backdrop-blur-sm p-8 rounded-2xl border border-amber-100 shadow-sm hover:shadow-md transition-shadow">
@@ -111,8 +111,8 @@ export default function HomeLandingPage() {
       {/* Footer */}
       <footer className="border-t border-amber-200/50 bg-amber-50/50 py-12">
         <div className="max-w-6xl mx-auto px-6 flex flex-col items-center justify-center text-amber-700/70">
-          <div className="font-bold text-xl tracking-tighter text-amber-900/50 mb-4">VaastuGPT</div>
-          <p>© 2026 VaastuGPT. All rights reserved.</p>
+          <div className="font-bold text-xl tracking-tighter text-amber-900/50 mb-4">Make My Home</div>
+          <p>© 2026 Make My Home. All rights reserved.</p>
           <p className="text-sm mt-2">Built for fast architectural ideation.</p>
         </div>
       </footer>

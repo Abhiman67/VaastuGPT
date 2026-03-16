@@ -3,14 +3,13 @@ import time
 import random
 import pandas as pd
 import numpy as np
-import hashlib
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # Allow the frontend to communicate with this backend
 
 # --- CONFIGURATION ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,37 +22,6 @@ nn_model = None
 scaler = None
 query_history = {}
 
-# --- VAASTU HEURISTICS ---
-VAASTU_NOTES = [
-    "Master Bedroom aligns with South-West corner for stability and leadership.",
-    "Kitchen mapped near South-East region, optimizing Agni (Fire) elements.",
-    "Main entrance prioritized for East or North-East facing orientation.",
-    "Central space (Brahmasthan) kept relatively open to allow positive energy flow.",
-    "Guest room conceptually positioned in North-West for proper air circulation.",
-    "Bathrooms isolated from primary living boundaries per traditional guidelines.",
-    "Staircase (if any) optimally positioned in South or West to balance structural weight.",
-    "Water elements implicitly designated towards North-East for prosperity flow."
-]
-
-def generate_vaastu_score(filename):
-    # Deterministic pseudo-random score based on filename so it's consistent
-    hash_val = int(hashlib.md5(filename.encode()).hexdigest(), 16)
-    # Score between 82 and 98
-    score = 82 + (hash_val % 17)
-    
-    # Pick 2-3 deterministic insights
-    num_insights = 2 + (hash_val % 2)
-    random.seed(hash_val)
-    insights = random.sample(VAASTU_NOTES, num_insights)
-    
-    # Reset seed to not mess with other random calls
-    random.seed()
-    
-    return {
-        "score": score,
-        "insights": insights
-    }
-
 def init_ml_model():
     global dataset_df, nn_model, scaler
     if not os.path.exists(CSV_FILE):
@@ -61,15 +29,18 @@ def init_ml_model():
         return False
         
     try:
+        # Load dataset
         df = pd.read_csv(CSV_FILE)
         df.columns = df.columns.str.strip()
         
+        # We need specific columns
         req_cols = ['Image Path', 'Square Feet', 'Beds', 'Baths', 'Garages']
         for col in req_cols:
             if col not in df.columns:
                 print(f"❌ ERROR: Missing column '{col}'")
                 return False
                 
+        # Clean data: convert to numeric, dropping NaNs or invalid strings
         for col in ['Square Feet', 'Beds', 'Baths', 'Garages']:
             df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', ''), errors='coerce')
             
@@ -77,6 +48,7 @@ def init_ml_model():
         df['filename'] = df['Image Path'].apply(lambda x: os.path.basename(str(x)))
         df = df[df['filename'] != '']
         
+        # Assign back to global
         dataset_df = df.reset_index(drop=True)
         
         if len(dataset_df) == 0:
@@ -85,20 +57,26 @@ def init_ml_model():
             
         print(f"✅ LOADED DATASET: {len(dataset_df)} entries.")
         
+        # Prepare features for ML Model
+        # Weights (We care more about beds/baths/garage exactness to some degree, but sq ft scale is larger) 
+        # StandardScaler takes care of the magnitude differences.
         features = dataset_df[['Square Feet', 'Beds', 'Baths', 'Garages']].values
         
         scaler = StandardScaler()
         scaled_features = scaler.fit_transform(features)
         
+        # Fit Nearest Neighbors
+        # Using 10 neighbors so we can show alternatives (cycle through them if asked repeatedly)
         nn_model = NearestNeighbors(n_neighbors=min(10, len(dataset_df)), metric='minkowski')
         nn_model.fit(scaled_features)
         
-        print("✅ ML MODEL INITIALIZED.")
+        print("✅ ML MODEL INITIALIZED (NearestNeighbors).")
         return True
     except Exception as e:
         print(f"❌ Error initializing ML model: {e}")
         return False
 
+# Initialize ML model directly at startup
 init_ml_model()
 
 @app.route('/generate', methods=['POST'])
@@ -107,7 +85,7 @@ def generate():
     
     if nn_model is None or scaler is None:
         if not init_ml_model():
-            return jsonify({"error": "ML Model not initialized"}), 500
+            return jsonify({"error": "ML Model not initialized / Dataset missing"}), 500
 
     data = request.json
     sq_ft = int(data.get('sq_ft', 1500))
@@ -119,46 +97,39 @@ def generate():
     if request_key not in query_history:
         query_history[request_key] = 0
 
-    print(f"\n🎯 Request: {sq_ft} sqft | {beds} Beds ({query_history[request_key] + 1})")
+    print(f"\n🎯 Request: {sq_ft} sqft | {beds} Beds | {baths} Baths | {garage} Garage (Attempt #{query_history[request_key] + 1})")
     
+    # 1. Processing Simulation
     fake_time = 3 + random.uniform(0.5, 1.5)
-    print(f"⏳ ML Model inferencing... ({fake_time:.2f}s)")
+    print(f"⏳ ML Model inferencing... (Mock {fake_time:.2f}s delay)")
     time.sleep(fake_time)
 
-    # ML Inference
+    # 2. ML Prediction (Finding closest match)
     user_query = np.array([[sq_ft, beds, baths, garage]])
     scaled_query = scaler.transform(user_query)
     distances, indices = nn_model.kneighbors(scaled_query)
     
+    # Cycling alternative matches to avoid showing same result if requesting same repeatedly
     current_attempt = query_history[request_key]
     result_idx = indices[0][current_attempt % len(indices[0])]
-    dist = distances[0][current_attempt % len(distances[0])]
     query_history[request_key] += 1
     
+    # Extract prediction row
     best_match_row = dataset_df.iloc[result_idx]
     
-    # Calculate Explainable AI "Match Confidence"
-    # Convert Euclidean distance to a percentage (heuristic)
-    # If dist is 0, it's 100%. Usually scaled dists range from 0.0 to 3.0+
-    match_percentage = max(75, min(100, int(100 - (dist * 10))))
-    
-    # Generate Vaastu Profile
-    filename = best_match_row['filename']
-    vaastu_data = generate_vaastu_score(filename)
-
     best_match = {
-        "filename": filename,
+        "filename": best_match_row['filename'],
         "sq_ft": int(best_match_row['Square Feet']),
         "bedrooms": int(best_match_row['Beds']),
         "bathrooms": int(best_match_row['Baths']),
-        "garage": int(best_match_row['Garages']),
-        "match_confidence": match_percentage,
-        "vaastu": vaastu_data
+        "garage": int(best_match_row['Garages'])
     }
 
+    print(f"✅ Result via ML KNN -> {best_match['filename']} (sq_ft: {best_match['sq_ft']}, beds: {best_match['bedrooms']})")
+    
     timestamp = int(time.time())
     return jsonify({
-        "image_url": f"http://127.0.0.1:5001/image/{filename}?t={timestamp}",
+        "image_url": f"http://127.0.0.1:5001/image/{best_match['filename']}?t={timestamp}",
         "details": best_match
     })
 
@@ -168,7 +139,9 @@ def get_image(filename):
     if os.path.exists(file_path):
         mimetype = 'image/jpeg' if filename.lower().endswith('.jpg') else 'image/png'
         return send_file(file_path, mimetype=mimetype)
-    return "Not found", 404
+    else:
+        print(f"❌ Missing Image: {file_path}")
+        return "Not found", 404
 
 if __name__ == '__main__':
     if not os.path.exists(IMAGE_FOLDER): os.makedirs(IMAGE_FOLDER)

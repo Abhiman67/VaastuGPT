@@ -29,7 +29,7 @@ export default function HeroSection() {
           animate={{ opacity: 1 }}
           transition={{ duration: 1, delay: 0.2 }}
         >
-          VaastuGPT
+          Make My Home
         </motion.h1>
         <motion.p
           className="text-sm tracking-widest text-amber-600 mb-6 font-bold uppercase"
