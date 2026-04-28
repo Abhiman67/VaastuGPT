@@ -1,0 +1,19 @@
+.DS_Store
+**/.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node / frontend
+node_modules/
+node_modules*/
+.next/
+dist/
+build/
+
+# Environment files
+.env
+.env.*
