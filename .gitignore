@@ -17,3 +17,6 @@ build/
 # Environment files
 .env
 .env.*
+
+# Generated outputs
+Backend/generated/

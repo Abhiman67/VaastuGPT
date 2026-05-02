@@ -1,0 +1,9 @@
+# Optional ML dependencies (for training + ML generation)
+# Install with: pip install -r Backend/requirements-ml.txt
+
+# PyTorch (CPU) - on Windows this may be a large install.
+torch
+
+# Progress bar
+
+tqdm

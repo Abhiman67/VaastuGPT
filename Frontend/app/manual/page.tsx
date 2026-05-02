@@ -16,6 +16,9 @@ export default function ManualPage() {
     garage: 2,
   })
   const [imageUrl, setImageUrl] = useState<string>("")
+  const [refinePrompt, setRefinePrompt] = useState<string>("")
+  const [isRefining, setIsRefining] = useState(false)
+  const [refineError, setRefineError] = useState<string | null>(null)
 
   const handleSubmit = async (data: any) => {
     setFormData(data)
@@ -47,6 +50,45 @@ export default function ManualPage() {
   const handleReset = () => {
     setState("idle")
     setImageUrl("")
+    setRefinePrompt("")
+    setRefineError(null)
+    setIsRefining(false)
+  }
+
+  const handleRefine = async () => {
+    if (!imageUrl) return
+    if (!refinePrompt.trim()) {
+      setRefineError("Enter a refinement prompt.")
+      return
+    }
+
+    setIsRefining(true)
+    setRefineError(null)
+
+    try {
+      const response = await fetch("http://127.0.0.1:5001/refine", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          image_url: imageUrl,
+          prompt: refinePrompt,
+        }),
+      })
+
+      const json = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(json?.error || "Refine failed")
+      }
+
+      if (json?.image_url) setImageUrl(json.image_url)
+    } catch (error: any) {
+      console.error("Refine error:", error)
+      setRefineError(error?.message || "Refine failed")
+    } finally {
+      setIsRefining(false)
+    }
   }
 
   return (
@@ -142,6 +184,26 @@ export default function ManualPage() {
                       Clear Canvas
                     </button>
                   </div>
+
+                  <div className="mb-4 px-2">
+                    <div className="flex items-start gap-3">
+                      <textarea
+                        value={refinePrompt}
+                        onChange={(e) => setRefinePrompt(e.target.value)}
+                        placeholder='Refine prompt (e.g., "Make it cleaner, add labels, keep the same room positions")'
+                        className="w-full min-h-[44px] max-h-[120px] resize-y text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                      />
+                      <button
+                        onClick={handleRefine}
+                        disabled={isRefining || !refinePrompt.trim()}
+                        className="shrink-0 h-[44px] px-4 text-sm font-semibold bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:hover:bg-gray-900 rounded-lg transition-colors"
+                      >
+                        {isRefining ? "Refining…" : "Refine"}
+                      </button>
+                    </div>
+                    {refineError && <p className="text-xs text-red-600 mt-2">{refineError}</p>}
+                  </div>
+
                   <div className="flex-1 bg-[#fbfaf8] border border-gray-100 rounded-lg p-2 flex items-center justify-center min-h-[500px]">
                     <img
                       src={imageUrl || "/placeholder.svg"}
