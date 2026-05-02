@@ -88,6 +88,24 @@ def _download_bytes(url: str, timeout: int = 30) -> bytes:
         return resp.read()
 
 
+def _build_knn_option(row, distance, index):
+    filename = row['filename']
+    timestamp = int(time.time())
+    return {
+        "index": index,
+        "image_url": f"http://127.0.0.1:5001/image/{filename}?t={timestamp}",
+        "details": {
+            "filename": filename,
+            "sq_ft": int(row['Square Feet']),
+            "bedrooms": int(row['Beds']),
+            "bathrooms": int(row['Baths']),
+            "garage": int(row['Garages']),
+            "source": "knn",
+            "distance": float(distance),
+        },
+    }
+
+
 def _deterministic_seed(payload: dict) -> int:
     # Stable seed per request payload so repeated requests are reproducible.
     seed_src = (
@@ -493,10 +511,19 @@ def generate():
     scaled_query = scaler.transform(user_query)
     distances, indices = nn_model.kneighbors(scaled_query)
     
-    # Default behavior: always return the closest match.
-    # If the caller wants variety, they can pass `variant` (0..k-1).
+    # Default behavior for the UI: return the top 4 candidates.
+    # If the caller wants a single result, they can pass `variant` (0..k-1).
     variant = _safe_int(data.get("variant", 0), 0)
     variant = max(0, min(variant, len(indices[0]) - 1))
+    option_count = max(1, min(_safe_int(data.get("count", 4), 4), len(indices[0])))
+    if data.get("count") is None:
+        option_count = min(4, len(indices[0]))
+
+    option_rows = []
+    for option_index in range(option_count):
+        result_idx = indices[0][option_index]
+        option_rows.append(_build_knn_option(dataset_df.iloc[result_idx], distances[0][option_index], option_index))
+
     result_idx = indices[0][variant]
     query_history[request_key] += 1
     
@@ -516,7 +543,8 @@ def generate():
     timestamp = int(time.time())
     return jsonify({
         "image_url": f"http://127.0.0.1:5001/image/{best_match['filename']}?t={timestamp}",
-        "details": {**best_match, "source": "knn"}
+        "details": {**best_match, "source": "knn"},
+        "options": option_rows,
     })
 
 
