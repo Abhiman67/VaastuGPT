@@ -8,7 +8,7 @@ import { LayoutGrid, Download } from "lucide-react"
 import Link from "next/link"
 
 export default function ChatPage() {
-  const [state, setState] = useState<"idle" | "loading" | "result">("idle")
+  const [state, setState] = useState<"idle" | "loading" | "options" | "result">("idle")
   const [formData, setFormData] = useState({
     sq_ft: 2500,
     bedrooms: 3,
@@ -16,6 +16,8 @@ export default function ChatPage() {
     garage: 2,
   })
   const [imageUrl, setImageUrl] = useState<string>("")
+  const [options, setOptions] = useState<any[]>([])
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState(0)
   const [refinePrompt, setRefinePrompt] = useState<string>("")
   const [isRefining, setIsRefining] = useState(false)
   const [refineError, setRefineError] = useState<string | null>(null)
@@ -30,17 +32,20 @@ export default function ChatPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, strategy: "knn", count: 4 }),
       })
 
       if (!response.ok) throw new Error("Generation failed")
 
       const result = await response.json()
-      setImageUrl(result.image_url)
+      const knnOptions = Array.isArray(result.options) ? result.options : []
+      setOptions(knnOptions)
+      setSelectedOptionIndex(0)
+      setImageUrl(knnOptions[0]?.image_url || result.image_url || "")
 
       // Simulate loading time for visual effect
       await new Promise((resolve) => setTimeout(resolve, 2000))
-      setState("result")
+      setState(knnOptions.length > 0 ? "options" : "result")
     } catch (error) {
       console.error("Error:", error)
       setState("idle")
@@ -50,9 +55,21 @@ export default function ChatPage() {
   const handleReset = () => {
     setState("idle")
     setImageUrl("")
+    setOptions([])
+    setSelectedOptionIndex(0)
     setRefinePrompt("")
     setRefineError(null)
     setIsRefining(false)
+  }
+
+  const selectedOption = options[selectedOptionIndex]
+
+  const handlePickOption = (option: any, index: number) => {
+    setSelectedOptionIndex(index)
+    setImageUrl(option?.image_url || "")
+    setRefinePrompt("")
+    setRefineError(null)
+    setState("result")
   }
 
   const handleRefine = async () => {
@@ -165,6 +182,57 @@ export default function ChatPage() {
               </motion.div>
             )}
 
+            {state === "options" && (
+              <motion.div
+                key="options"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="z-10 w-full h-full p-10 flex items-center justify-center"
+              >
+                <div className="relative w-full max-w-6xl max-h-[90vh] bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-[#e8e6e1] overflow-hidden flex flex-col p-6">
+                  <div className="flex justify-between items-center mb-6 px-2">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-800">Pick a KNN Candidate</h3>
+                      <p className="text-xs text-gray-500 font-medium mt-1">
+                        Based on {formData.sq_ft} sq ft • {formData.bedrooms} Beds • {formData.bathrooms} Baths
+                      </p>
+                    </div>
+                    <button onClick={handleReset} className="text-sm font-medium text-gray-500 hover:text-gray-900 border border-gray-200 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all">
+                      Clear Canvas
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 overflow-y-auto pr-1">
+                    {options.map((option, index) => (
+                      <button
+                        key={`${option?.details?.filename || index}-${index}`}
+                        onClick={() => handlePickOption(option, index)}
+                        className={`text-left rounded-xl border p-3 transition-all ${selectedOptionIndex === index ? "border-gray-900 shadow-md" : "border-gray-200 hover:border-gray-400"}`}
+                      >
+                        <div className="aspect-[4/3] bg-[#fbfaf8] rounded-lg border border-gray-100 overflow-hidden flex items-center justify-center">
+                          <img
+                            src={option?.image_url || "/placeholder.svg"}
+                            alt={`KNN option ${index + 1}`}
+                            className="w-full h-full object-contain mix-blend-multiply"
+                          />
+                        </div>
+                        <div className="mt-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-semibold text-gray-800">Option {index + 1}</h4>
+                            <span className="text-[11px] text-gray-500">Dist {option?.details?.distance?.toFixed?.(3) ?? "-"}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {option?.details?.sq_ft} sq ft • {option?.details?.bedrooms} Beds • {option?.details?.bathrooms} Baths
+                          </p>
+                          <p className="text-[11px] text-gray-400 mt-1 break-all">{option?.details?.filename}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {state === "result" && (
               <motion.div 
                 key="result"
@@ -175,14 +243,26 @@ export default function ChatPage() {
                 <div className="relative w-full max-w-4xl max-h-[85vh] bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-[#e8e6e1] overflow-hidden flex flex-col p-6">
                   <div className="flex justify-between items-center mb-6 px-2">
                     <div>
-                      <h3 className="text-lg font-bold text-gray-800">Generated Floor Plan</h3>
+                      <h3 className="text-lg font-bold text-gray-800">Refine Selected Plan</h3>
                       <p className="text-xs text-gray-500 font-medium mt-1">
-                        Based on {formData.sq_ft} sq ft • {formData.bedrooms} Beds • {formData.bathrooms} Baths
+                        {selectedOption?.details?.filename ? `Selected ${selectedOption.details.filename} • now describe the redesign you want` : `Based on ${formData.sq_ft} sq ft • ${formData.bedrooms} Beds • ${formData.bathrooms} Baths`}
                       </p>
                     </div>
-                    <button onClick={handleReset} className="text-sm font-medium text-gray-500 hover:text-gray-900 border border-gray-200 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all">
-                      Clear Canvas
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setState("options")}
+                        className="text-sm font-medium text-gray-500 hover:text-gray-900 border border-gray-200 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all"
+                      >
+                        Back to Options
+                      </button>
+                      <button onClick={handleReset} className="text-sm font-medium text-gray-500 hover:text-gray-900 border border-gray-200 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all">
+                        Clear Canvas
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mx-2 mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Picked a KNN option. Now enter a refinement prompt and send it to Nano Banana to redesign this layout.
                   </div>
 
                   <div className="mb-4 px-2">
@@ -190,7 +270,7 @@ export default function ChatPage() {
                       <textarea
                         value={refinePrompt}
                         onChange={(e) => setRefinePrompt(e.target.value)}
-                        placeholder='Refine prompt (e.g., "Make it cleaner, add labels, keep the same room positions")'
+                        placeholder='Describe the redesign (e.g., "Make it cleaner, add labels, keep the room positions the same")'
                         className="w-full min-h-[44px] max-h-[120px] resize-y text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
                       />
                       <button
@@ -198,7 +278,7 @@ export default function ChatPage() {
                         disabled={isRefining || !refinePrompt.trim()}
                         className="shrink-0 h-[44px] px-4 text-sm font-semibold bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:hover:bg-gray-900 rounded-lg transition-colors"
                       >
-                        {isRefining ? "Refining…" : "Refine"}
+                        {isRefining ? "Redesigning…" : "Send to Nano Banana"}
                       </button>
                     </div>
                     {refineError && <p className="text-xs text-red-600 mt-2">{refineError}</p>}
